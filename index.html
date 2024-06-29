@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>正規表現練習アプリ</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        h1, h2 {
+            text-align: center;
+        }
+        .section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background-color: #f9f9f9;
+        }
+        .input-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input[type="text"], textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .meta-buttons, .preset-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            margin-top: 5px;
+        }
+        .meta-button, .preset-button {
+            padding: 5px 10px;
+            background-color: #f0f0f0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .preset-button {
+            background-color: #e1e1e1;
+        }
+        #testButton {
+            display: block;
+            width: 100%;
+            padding: 10px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+        }
+        #result {
+            margin-top: 20px;
+        }
+        .match {
+            color: #4CAF50;
+            margin-left: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>正規表現練習アプリ</h1>
+    
+    <div class="section">
+        <h2>1. 入力</h2>
+        <div class="input-group">
+            <label for="testString">テスト文字列:</label>
+            <div class="preset-buttons" id="presetButtons"></div>
+            <textarea id="testString" rows="5" placeholder="テストする文字列を入力（複数行可）"></textarea>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>2. 処理</h2>
+        <div class="input-group">
+            <label for="pattern">正規表現パターン:</label>
+            <input type="text" id="pattern" placeholder="例: ^(\w+)\s(\w+)$">
+            <div class="meta-buttons" id="metaButtons"></div>
+        </div>
+        <div class="input-group">
+            <label for="outputFormat">出力フォーマット:</label>
+            <input type="text" id="outputFormat" placeholder="例: 名: $2, 姓: $1" value="$0">
+            <p>$0: マッチ全体, $1, $2, ...: キャプチャグループ</p>
+        </div>
+        <button id="testButton">テスト実行</button>
+    </div>
+
+    <div class="section">
+        <h2>3. 出力</h2>
+        <div id="result"></div>
+    </div>
+
+    <script>
+        const metaCharacters = [
+            { char: '.', description: '任意の1文字' },
+            { char: '*', description: '0回以上の繰り返し' },
+            { char: '+', description: '1回以上の繰り返し' },
+            { char: '?', description: '0回または1回の出現' },
+            { char: '^', description: '行の先頭' },
+            { char: '$', description: '行の末尾' },
+            { char: '\\d', description: '数字' },
+            { char: '\\w', description: '英数字とアンダースコア' },
+            { char: '\\s', description: '空白文字' },
+            { char: '[', description: '文字クラスの開始' },
+            { char: ']', description: '文字クラスの終了' },
+            { char: '(', description: 'グループの開始' },
+            { char: ')', description: 'グループの終了' },
+            { char: '|', description: '選択（または）' },
+        ];
+
+        const presetTestStrings = [
+            { name: '基本', value: 'apple\nbanana\ncherry\ndate\neggplant' },
+            { name: '数字', value: '123\n456\n789\n101112\n131415' },
+            { name: 'メール', value: 'user@example.com\ninfo@company.co.jp\njohn.doe@service.net\ninvalid.email@.com\nno@symbol' },
+            { name: '日付', value: '2023/05/15\n2023-05-15\n15/05/2023\n15-05-2023\n2023年5月15日' },
+            { name: '複合', value: 'John Doe, 30歳, john.doe@example.com\nJane Smith, 25歳, jane.smith@company.co.jp\nTaro Yamada, 40歳, taro.yamada@service.net\nHanako Sato, 35歳, hanako.sato@example.com' },
+        ];
+
+        const patternInput = document.getElementById('pattern');
+        const testStringInput = document.getElementById('testString');
+        const outputFormatInput = document.getElementById('outputFormat');
+        const testButton = document.getElementById('testButton');
+        const resultDiv = document.getElementById('result');
+        const metaButtonsDiv = document.getElementById('metaButtons');
+        const presetButtonsDiv = document.getElementById('presetButtons');
+
+        metaCharacters.forEach(meta => {
+            const button = document.createElement('button');
+            button.textContent = meta.char;
+            button.title = meta.description;
+            button.className = 'meta-button';
+            button.onclick = () => insertMetaChar(meta.char);
+            metaButtonsDiv.appendChild(button);
+        });
+
+        presetTestStrings.forEach((preset, index) => {
+            const button = document.createElement('button');
+            button.textContent = `テスト ${index + 1}: ${preset.name}`;
+            button.className = 'preset-button';
+            button.onclick = () => {
+                testStringInput.value = preset.value;
+            };
+            presetButtonsDiv.appendChild(button);
+        });
+
+        function insertMetaChar(char) {
+            const start = patternInput.selectionStart;
+            const end = patternInput.selectionEnd;
+            patternInput.value = patternInput.value.substring(0, start) + char + patternInput.value.substring(end);
+            patternInput.focus();
+            patternInput.setSelectionRange(start + char.length, start + char.length);
+        }
+
+        testButton.onclick = function() {
+            const pattern = patternInput.value;
+            const testString = testStringInput.value;
+            const outputFormat = outputFormatInput.value;
+
+            try {
+                const regex = new RegExp(pattern, 'gm');
+                const lines = testString.split('\n');
+                let resultHtml = '<h3>結果:</h3>';
+
+                lines.forEach((line, index) => {
+                    const matches = [...line.matchAll(regex)];
+                    if (matches.length > 0) {
+                        resultHtml += `<p>行 ${index + 1}: ${line}</p>`;
+                        matches.forEach(match => {
+                            let output = outputFormat;
+                            for (let i = 0; i <= match.length; i++) {
+                                output = output.replace(new RegExp(`\\$${i}`, 'g'), match[i] || '');
+                            }
+                            resultHtml += `<p class="match">${output}</p>`;
+                        });
+                    }
+                });
+
+                resultDiv.innerHTML = resultHtml;
+            } catch (error) {
+                resultDiv.innerHTML = `<p style="color: red;">エラー: ${error.message}</p>`;
+            }
+        };
+    </script>
+</body>
+</html>
